@@ -1,0 +1,83 @@
+{
+  "name": "n8n-nodes-queue-worker",
+  "version": "1.0.1",
+  "description": "An n8n community node for consuming and producing messages from RabbitMQ, Apache Kafka, and AWS SQS with schema validation and queue worker capabilities.",
+  "license": "MIT",
+  "author": {
+    "name": "Chella S",
+    "email": "YOUR_EMAIL@example.com"
+  },
+  "homepage": "https://github.com/YOUR_GITHUB_USERNAME/n8n-nodes-queue-worker",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_GITHUB_USERNAME/n8n-nodes-queue-worker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/YOUR_GITHUB_USERNAME/n8n-nodes-queue-worker/issues"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint \"{nodes,credentials}/**/*.ts\"",
+    "lint:fix": "eslint \"{nodes,credentials}/**/*.ts\" --fix",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "n8n-nodes",
+    "queue",
+    "queue-worker",
+    "rabbitmq",
+    "kafka",
+    "aws",
+    "sqs",
+    "message-queue",
+    "consumer",
+    "producer",
+    "workflow",
+    "automation"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "nodes": [
+      "dist/nodes/QueueWorker/QueueWorker.node.js",
+      "dist/nodes/QueueWorker/QueueWorkerTrigger.node.js"
+    ],
+    "credentials": [
+      "dist/credentials/RabbitMQ.credentials.js",
+      "dist/credentials/Kafka.credentials.js",
+      "dist/credentials/AwsSqs.credentials.js"
+    ]
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.500.0",
+    "ajv": "^8.12.0",
+    "amqplib": "^0.10.3",
+    "kafkajs": "^2.2.4"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.8.2",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^18.16.0",
+    "@typescript-eslint/eslint-plugin": "^5.59.0",
+    "@typescript-eslint/parser": "^5.59.0",
+    "eslint": "^8.39.0",
+    "jest": "^29.5.0",
+    "n8n-workflow": "^1.0.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.4"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "name": "Queue Worker Manual Acknowledge Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "provider": "rabbitmq",
+        "queueName": "orders.v1",
+        "autoAck": false
+      },
+      "id": "7f654b0c-4318-49be-8b2b-986c4e098a51",
+      "name": "Queue Worker Trigger",
+      "type": "n8n-nodes-queue-worker.queueWorkerTrigger",
+      "typeVersion": 1,
+      "position": [
+        100,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process order payload\nconst payload = items[0].json.payload;\npayload.processedAt = new Date().toISOString();\npayload.status = \"processed\";\nreturn [{ json: payload }];"
+      },
+      "id": "3be93c3c-8ab5-4a6c-94d3-7d1a58bc283a",
+      "name": "Process Logic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "provider": "rabbitmq",
+        "operation": "ack",
+        "messageObject": "={{ $node[\"Queue Worker Trigger\"].json }}"
+      },
+      "id": "e2213e4b-67a0-47b2-bdcf-8b6b15fe36cd",
+      "name": "Queue Worker Ack",
+      "type": "n8n-nodes-queue-worker.queueWorker",
+      "typeVersion": 1,
+      "position": [
+        540,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Queue Worker Trigger": {
+      "main": [
+        [
+          {
+            "node": "Process Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Logic": {
+      "main": [
+        [
+          {
+            "node": "Queue Worker Ack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "f9012351-419b-4395-8bc2-a12852bb0791",
+  "id": "1"
+}

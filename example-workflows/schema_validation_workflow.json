@@ -1,0 +1,142 @@
+{
+  "name": "Queue Worker Schema Validation Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "provider": "rabbitmq",
+        "queueName": "orders.v1",
+        "autoAck": false,
+        "schemaSource": "parameter",
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"orderId\": { \"type\": \"string\" },\n    \"amount\": { \"type\": \"number\", \"minimum\": 0.1 }\n  },\n  \"required\": [\"orderId\", \"amount\"]\n}"
+      },
+      "id": "1802a4bf-bc3a-4428-ba78-9e6727289f81",
+      "name": "Queue Worker Trigger",
+      "type": "n8n-nodes-queue-worker.queueWorkerTrigger",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "type": "bool"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.validation.valid }}",
+                    "rightValue": true,
+                    "operator": "equals"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "valid"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "type": "bool"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.validation.valid }}",
+                    "rightValue": false,
+                    "operator": "equals"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "invalid"
+            }
+          ]
+        }
+      },
+      "id": "e28cf692-f04b-4f8a-9213-398d5c4b8b6e",
+      "name": "Validation Branch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "provider": "rabbitmq",
+        "operation": "ack",
+        "messageObject": "={{ $node[\"Queue Worker Trigger\"].json }}"
+      },
+      "id": "4a15ef45-8121-4fa3-94c6-2c5e523f03b5",
+      "name": "Ack Valid Message",
+      "type": "n8n-nodes-queue-worker.queueWorker",
+      "typeVersion": 1,
+      "position": [
+        560,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "provider": "rabbitmq",
+        "operation": "nack",
+        "messageObject": "={{ $node[\"Queue Worker Trigger\"].json }}",
+        "deadLetterQueue": "orders.dlq"
+      },
+      "id": "a901ffba-4b2a-4bc4-b778-9e583b28b7e2",
+      "name": "Nack & Send to DLQ",
+      "type": "n8n-nodes-queue-worker.queueWorker",
+      "typeVersion": 1,
+      "position": [
+        560,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Queue Worker Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validation Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Branch": {
+      "main": [
+        [
+          {
+            "node": "Ack Valid Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nack & Send to DLQ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "fcf1d08e-1736-4d0c-a9e9-bb6e0828cf9b",
+  "id": "2"
+}
