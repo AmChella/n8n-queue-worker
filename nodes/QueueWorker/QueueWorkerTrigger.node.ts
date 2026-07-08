@@ -265,23 +265,34 @@ export class QueueWorkerTrigger implements INodeType {
 		};
 
 		const runContinuous = async () => {
-			try {
-				await adapter.connect();
-				while (isRunning) {
-					try {
-						const message = await adapter.consume();
-						if (message && isRunning) {
-							processMessage(message);
-						}
-					} catch (err: any) {
-						if (isRunning) {
-							// Add a delay to prevent CPU thrashing in case of persistent errors
-							await new Promise((resolve) => setTimeout(resolve, 2000));
+			while (isRunning) {
+				try {
+					await adapter.connect();
+					while (isRunning) {
+						try {
+							const message = await adapter.consume();
+							if (message && isRunning) {
+								processMessage(message);
+							}
+						} catch (err: any) {
+							if (isRunning) {
+								// Add a delay to prevent CPU thrashing in case of persistent errors
+								await new Promise((resolve) => setTimeout(resolve, 2000));
+							}
 						}
 					}
+				} catch (err) {
+					if (isRunning) {
+						// Wait 5 seconds before trying to reconnect on connection failures
+						await new Promise((resolve) => setTimeout(resolve, 5000));
+					}
+				} finally {
+					try {
+						await adapter.disconnect();
+					} catch (dErr) {
+						// Ignore disconnect errors
+					}
 				}
-			} catch (err) {
-				// Handle connection/initialization error
 			}
 		};
 
