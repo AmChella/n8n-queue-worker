@@ -60,7 +60,8 @@
     "@aws-sdk/client-sqs": "^3.500.0",
     "ajv": "^8.12.0",
     "amqplib": "^0.10.3",
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "n8n-nodes-queue-worker": "file:n8n-nodes-queue-worker-1.0.1.tgz"
   },
   "devDependencies": {
     "@types/amqplib": "^0.8.2",
@@ -79,5 +80,9 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "allowScripts": {
+    "file:..": true,
+    "file:/home/chellapandi/Office/n8n/agent-prompt/n8n-nodes-queue-worker/n8n-nodes-queue-worker-1.0.1.tgz": true
   }
 }
