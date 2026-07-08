@@ -278,14 +278,17 @@ export class QueueWorkerTrigger implements INodeType {
 					while (isRunning) {
 						try {
 							const message = await adapter.consume();
-							if (message && isRunning) {
+							// consume() returns null when adapter is disconnected
+							if (!message) {
+								break;
+							}
+							if (isRunning) {
 								processMessage(message);
 							}
 						} catch (err: any) {
 							if (isRunning) {
-								// Add a delay to prevent CPU thrashing in case of persistent errors
-								await new Promise((resolve) => setTimeout(resolve, 2000));
-								throw err;
+								// Break inner loop to trigger reconnect via outer loop
+								break;
 							}
 						}
 					}
@@ -300,6 +303,10 @@ export class QueueWorkerTrigger implements INodeType {
 					} catch (dErr) {
 						// Ignore disconnect errors
 					}
+				}
+				// Small delay before reconnecting to prevent tight-loop thrashing
+				if (isRunning) {
+					await new Promise((resolve) => setTimeout(resolve, 2000));
 				}
 			}
 		};
@@ -359,6 +366,7 @@ export class QueueWorkerTrigger implements INodeType {
 			}
 		};
 
+		// Start consumption loops (fire-and-forget for production/active mode)
 		if (executionMode === 'continuous') {
 			runContinuous();
 		} else if (executionMode === 'once') {
@@ -372,8 +380,35 @@ export class QueueWorkerTrigger implements INodeType {
 			await adapter.disconnect();
 		};
 
+		// manualTriggerFunction is called by n8n when the user clicks
+		// "Execute Workflow" or "Test Step" in the editor. It waits for
+		// a single message (up to 30s) before returning, which allows
+		// the editor to display the consumed data.
+		const manualTriggerFunction = async () => {
+			// The consumption loops above are already running.
+			// For manual mode, we just need to wait until n8n receives
+			// the first emit (which the loop will produce), then n8n
+			// will call closeFunction to shut everything down.
+			// This promise resolves once data is emitted.
+			return new Promise<void>((resolve) => {
+				// Give up to 30 seconds for a message to arrive
+				const timeout = setTimeout(() => {
+					resolve();
+				}, 30000);
+
+				// Override emit to detect when data flows
+				const originalEmit = this.emit.bind(this);
+				this.emit = (data) => {
+					clearTimeout(timeout);
+					originalEmit(data);
+					resolve();
+				};
+			});
+		};
+
 		return {
 			closeFunction,
+			manualTriggerFunction,
 		};
 	}
 }

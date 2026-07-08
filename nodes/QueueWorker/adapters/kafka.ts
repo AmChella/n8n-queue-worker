@@ -248,7 +248,12 @@ export class KafkaAdapter implements QueueAdapter {
 
 	async disconnect(): Promise<void> {
 		this.isConsuming = false;
+		// Resolve all pending consume() promises with null so callers unblock
+		const resolvers = this.pendingResolvers;
 		this.pendingResolvers = [];
+		for (const resolve of resolvers) {
+			resolve(null as unknown as QueueMessage);
+		}
 		this.messageBuffer = [];
 
 		try {
