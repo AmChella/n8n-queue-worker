@@ -56,7 +56,7 @@ export class RabbitMqAdapter implements QueueAdapter {
 		}
 	}
 
-	async consume(): Promise<QueueMessage> {
+	async consume(timeoutMs?: number): Promise<QueueMessage | null> {
 		if (!this.channel) {
 			throw new Error('RabbitMQ channel not initialized. Call connect() first.');
 		}
@@ -120,7 +120,29 @@ export class RabbitMqAdapter implements QueueAdapter {
 			return this.messageBuffer.shift()!;
 		}
 
-		return new Promise<QueueMessage>((resolve) => {
+		if (timeoutMs !== undefined) {
+			return new Promise<QueueMessage | null>((resolve) => {
+				let timer: NodeJS.Timeout | null = setTimeout(() => {
+					const index = this.pendingResolvers.indexOf(resolveWrapper);
+					if (index !== -1) {
+						this.pendingResolvers.splice(index, 1);
+					}
+					resolve(null);
+				}, timeoutMs);
+
+				const resolveWrapper = (msg: QueueMessage) => {
+					if (timer) {
+						clearTimeout(timer);
+						timer = null;
+					}
+					resolve(msg);
+				};
+
+				this.pendingResolvers.push(resolveWrapper);
+			});
+		}
+
+		return new Promise<QueueMessage | null>((resolve) => {
 			this.pendingResolvers.push(resolve);
 		});
 	}

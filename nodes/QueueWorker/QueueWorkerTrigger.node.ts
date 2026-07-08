@@ -80,6 +80,80 @@ export class QueueWorkerTrigger implements INodeType {
 				description: 'Name of the queue or topic to consume from',
 			},
 			{
+				displayName: 'Execution Mode',
+				name: 'executionMode',
+				type: 'options',
+				options: [
+					{
+						name: 'Watch Continuously',
+						value: 'continuous',
+						description: 'Keep the trigger active and consume messages continuously as they arrive',
+					},
+					{
+						name: 'Scheduled Polling',
+						value: 'scheduled',
+						description: 'Connect to the queue periodically at scheduled intervals, consume available messages, and process them',
+					},
+					{
+						name: 'At Once',
+						value: 'once',
+						description: 'Connect, consume all currently available messages (up to limits), process them immediately, and then stop',
+					},
+				],
+				default: 'continuous',
+				description: 'How the trigger should listen for and consume messages',
+			},
+			{
+				displayName: 'Polling Interval',
+				name: 'pollingInterval',
+				type: 'number',
+				default: 60,
+				displayOptions: {
+					show: {
+						executionMode: ['scheduled'],
+					},
+				},
+				description: 'How often to poll the queue',
+			},
+			{
+				displayName: 'Interval Unit',
+				name: 'intervalUnit',
+				type: 'options',
+				options: [
+					{
+						name: 'Seconds',
+						value: 'seconds',
+					},
+					{
+						name: 'Minutes',
+						value: 'minutes',
+					},
+					{
+						name: 'Hours',
+						value: 'hours',
+					},
+				],
+				default: 'seconds',
+				displayOptions: {
+					show: {
+						executionMode: ['scheduled'],
+					},
+				},
+				description: 'The unit of time for the polling interval',
+			},
+			{
+				displayName: 'Max Messages per Poll',
+				name: 'maxMessages',
+				type: 'number',
+				default: 10,
+				displayOptions: {
+					show: {
+						executionMode: ['scheduled', 'once'],
+					},
+				},
+				description: 'The maximum number of messages to consume in a single polling run',
+			},
+			{
 				displayName: 'Auto ACK',
 				name: 'autoAck',
 				type: 'boolean',
@@ -145,6 +219,7 @@ export class QueueWorkerTrigger implements INodeType {
 		const prefetch = this.getNodeParameter('prefetch', 10) as number;
 		const deadLetterQueue = this.getNodeParameter('deadLetterQueue', '') as string;
 		const schemaSource = this.getNodeParameter('schemaSource', 'none') as string;
+		const executionMode = this.getNodeParameter('executionMode', 'continuous') as string;
 		
 		let jsonSchema: string | undefined;
 		if (schemaSource === 'parameter') {
@@ -165,43 +240,113 @@ export class QueueWorkerTrigger implements INodeType {
 		};
 
 		const adapter = QueueFactory.getAdapter(provider, credentials, options);
-		await adapter.connect();
-
 		let isRunning = true;
 		const validator = new AjvValidator();
 
-		const consumeLoop = async () => {
+		const processMessage = (message: any) => {
+			let validationResult: any = { valid: true };
+			if (jsonSchema) {
+				validationResult = validator.validate(message.payload, jsonSchema);
+			}
+
+			const outputData = {
+				messageId: message.messageId,
+				workflow: message.workflow,
+				schema: message.schema,
+				replyTo: message.replyTo,
+				payload: message.payload,
+				metadata: message.metadata,
+				validation: validationResult,
+				// Expose the raw message structure so manual Ack/Nack operations can reference it
+				raw: message.raw,
+			};
+
+			this.emit([this.helpers.returnJsonArray(outputData)]);
+		};
+
+		const runContinuous = async () => {
+			try {
+				await adapter.connect();
+				while (isRunning) {
+					try {
+						const message = await adapter.consume();
+						if (message && isRunning) {
+							processMessage(message);
+						}
+					} catch (err: any) {
+						if (isRunning) {
+							// Add a delay to prevent CPU thrashing in case of persistent errors
+							await new Promise((resolve) => setTimeout(resolve, 2000));
+						}
+					}
+				}
+			} catch (err) {
+				// Handle connection/initialization error
+			}
+		};
+
+		const runOnce = async () => {
+			try {
+				await adapter.connect();
+				let count = 0;
+				const max = this.getNodeParameter('maxMessages', 10) as number;
+				while (isRunning && count < max) {
+					const message = await adapter.consume(1000);
+					if (!message) {
+						break;
+					}
+					processMessage(message);
+					count++;
+				}
+			} catch (err) {
+				// Ignore/log
+			} finally {
+				await adapter.disconnect();
+			}
+		};
+
+		const runScheduled = async () => {
+			const interval = this.getNodeParameter('pollingInterval', 60) as number;
+			const unit = this.getNodeParameter('intervalUnit', 'seconds') as string;
+			const max = this.getNodeParameter('maxMessages', 10) as number;
+
+			let multiplier = 1000;
+			if (unit === 'minutes') multiplier = 60 * 1000;
+			if (unit === 'hours') multiplier = 60 * 60 * 1000;
+
+			const intervalMs = interval * multiplier;
+
 			while (isRunning) {
 				try {
-					const message = await adapter.consume();
-					
-					let validationResult: any = { valid: true };
-					if (jsonSchema) {
-						validationResult = validator.validate(message.payload, jsonSchema);
+					await adapter.connect();
+					let count = 0;
+					while (isRunning && count < max) {
+						const message = await adapter.consume(1000);
+						if (!message) {
+							break;
+						}
+						processMessage(message);
+						count++;
 					}
+				} catch (err) {
+					// Ignore/log
+				} finally {
+					await adapter.disconnect();
+				}
 
-					const outputData = {
-						messageId: message.messageId,
-						workflow: message.workflow,
-						schema: message.schema,
-						replyTo: message.replyTo,
-						payload: message.payload,
-						metadata: message.metadata,
-						validation: validationResult,
-						// Expose the raw message structure so manual Ack/Nack operations can reference it
-						raw: message.raw,
-					};
-
-					this.emit([this.helpers.returnJsonArray(outputData)]);
-				} catch (err: any) {
-					// Add a delay to prevent CPU thrashing in case of persistent errors
-					await new Promise((resolve) => setTimeout(resolve, 2000));
+				if (isRunning) {
+					await new Promise((resolve) => setTimeout(resolve, intervalMs));
 				}
 			}
 		};
 
-		// Start loop asynchronously
-		consumeLoop();
+		if (executionMode === 'continuous') {
+			runContinuous();
+		} else if (executionMode === 'once') {
+			runOnce();
+		} else if (executionMode === 'scheduled') {
+			runScheduled();
+		}
 
 		const closeFunction = async () => {
 			isRunning = false;

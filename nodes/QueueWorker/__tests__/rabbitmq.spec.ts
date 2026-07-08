@@ -157,4 +157,41 @@ describe('RabbitMqAdapter', () => {
 		expect(mockChannel.close).toHaveBeenCalled();
 		expect(mockConnection.close).toHaveBeenCalled();
 	});
+
+	test('should return null if consume times out before message is received', async () => {
+		const credentials = {};
+		const options = { queueName: 'timeout-queue' };
+		const adapter = new RabbitMqAdapter(credentials, options);
+		await adapter.connect();
+
+		const consumePromise = adapter.consume(100);
+		const result = await consumePromise;
+		expect(result).toBeNull();
+	});
+
+	test('should return message if message is received before timeout', async () => {
+		const credentials = {};
+		const options = { queueName: 'timeout-queue' };
+		const adapter = new RabbitMqAdapter(credentials, options);
+		await adapter.connect();
+
+		const consumePromise = adapter.consume(500);
+
+		// Trigger the mock consumer callback
+		const consumeCallback = mockChannel.consume.mock.calls[0][1];
+		const mockRawMsg = {
+			content: Buffer.from(JSON.stringify({ hello: 'world' })),
+			properties: {
+				correlationId: 'corr-id',
+				headers: {
+					workflow: 'test-flow',
+				},
+			},
+		};
+		consumeCallback(mockRawMsg);
+
+		const result = await consumePromise;
+		expect(result).not.toBeNull();
+		expect(result?.payload).toEqual({ hello: 'world' });
+	});
 });

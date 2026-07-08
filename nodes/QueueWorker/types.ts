@@ -16,7 +16,7 @@ export interface QueueMessage {
 
 export interface QueueAdapter {
 	connect(): Promise<void>;
-	consume(): Promise<QueueMessage>;
+	consume(timeoutMs?: number): Promise<QueueMessage | null>;
 	publish(queueOrTopic: string, payload: unknown, options?: Record<string, any>): Promise<void>;
 	ack(message: QueueMessage): Promise<void>;
 	nack(message: QueueMessage): Promise<void>;

@@ -65,6 +65,12 @@ npm install n8n-nodes-queue-worker
 
 ### Trigger Node: Queue Worker Trigger
 Listens for messages from a queue/topic and emits them to the workflow.
+*   **Execution Mode**:
+    *   `Watch Continuously`: Runs a continuous background consumer daemon (default).
+    *   `Scheduled Polling`: Connects periodically at a defined interval, polls available messages, processes them, and disconnects.
+    *   `At Once`: Connects, polls all currently available messages (up to limits), processes them immediately, and stops.
+*   **Polling Interval / Interval Unit**: Configures the timer interval for `Scheduled Polling`.
+*   **Max Messages per Poll**: Limits the number of messages fetched in a single poll under `Scheduled Polling` or `At Once` modes.
 *   **Auto ACK**: If enabled, acknowledges the message immediately upon ingestion. If disabled, a downstream Action node must be used to perform manual `ack` or `nack`.
 *   **JSON Schema Validation**: Set up validation rules on-trigger. Messages that fail validation are tagged with `validation: { valid: false, errors: [...] }`.
 
