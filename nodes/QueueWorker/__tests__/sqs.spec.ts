@@ -1,6 +1,5 @@
 import {
 	SQSClient,
-	ReceiveMessageCommand,
 	SendMessageCommand,
 	DeleteMessageCommand,
 	ChangeMessageVisibilityCommand,

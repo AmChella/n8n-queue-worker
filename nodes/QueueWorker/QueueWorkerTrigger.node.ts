@@ -6,6 +6,7 @@ import {
 } from 'n8n-workflow';
 import { QueueFactory } from './QueueFactory';
 import { AjvValidator } from './validator/ajvValidator';
+import { getPackageVersion } from './utils';
 
 export class QueueWorkerTrigger implements INodeType {
 	description: INodeTypeDescription = {
@@ -50,6 +51,12 @@ export class QueueWorkerTrigger implements INodeType {
 			},
 		],
 		properties: [
+			{
+				displayName: `App Version: ${getPackageVersion()}`,
+				name: 'appVersionNotice',
+				type: 'notice',
+				default: '',
+			},
 			{
 				displayName: 'Queue Provider',
 				name: 'provider',
