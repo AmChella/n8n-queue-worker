@@ -285,6 +285,7 @@ export class QueueWorkerTrigger implements INodeType {
 							if (isRunning) {
 								// Add a delay to prevent CPU thrashing in case of persistent errors
 								await new Promise((resolve) => setTimeout(resolve, 2000));
+								throw err;
 							}
 						}
 					}
